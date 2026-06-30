@@ -195,7 +195,7 @@ class MainActivity : Activity() {
                 rotation = it.animatedValue as Float
             }
             animator.addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator?) {
+                override fun onAnimationEnd(animation: Animator) {
                     val angulo = ((rotation % 360) + 360) % 360
                     val sector = ((360 - angulo) / 45).toInt() % 8
                     val mult = multiplicadores[sector]
@@ -612,7 +612,7 @@ class MainActivity : Activity() {
                 invalidate()
             }
             animator.addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator?) {
+                override fun onAnimationEnd(animation: Animator) {
                     val finalAngle = (ballAngle % 360 + 360) % 360
                     val sector = ((finalAngle) / 30).toInt() % 12
                     val colorSector = when {
