@@ -1,15 +1,18 @@
 package com.fenixcasino.app
 
-import android.content.SharedPreferences
-import android.content.Context
-
+import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -30,7 +33,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var tvPuntos: TextView
     private lateinit var contenedorJuegos: FrameLayout
-    private lateinit var prefs: android.content.SharedPreferences
+    private lateinit var prefs: SharedPreferences
     private var puntosUsuario: Int = 100
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,27 +65,27 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        fun crearBoton(texto: String, onClick: View.OnClickListener): Button {
+        fun crearBoton(texto: String, onClick: (View) -> Unit): Button {
             return Button(this).apply {
-                setText(texto)
+                text = texto
                 setBackgroundColor(Color.parseColor("#C41E3A"))
                 setTextColor(Color.WHITE)
-                setTypeface(null, android.graphics.Typeface.BOLD)
+                setTypeface(null, Typeface.BOLD)
                 textSize = 18f
                 setOnClickListener(onClick)
-                val params = LinearLayout.LayoutParams(
+                layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                params.setMargins(0, 20, 0, 0)
-                layoutParams = params
+                ).apply {
+                    setMargins(0, 20, 0, 0)
+                }
             }
         }
 
-        val btnRuleta = crearBoton("🎰 Ruleta", View.OnClickListener { iniciarJuegoRuleta() })
-        val btnRasca = crearBoton("🎟️ Rasca y Gana", View.OnClickListener { iniciarJuegoRasca() })
-        val btnBlackjack = crearBoton("🃏 Blackjack", View.OnClickListener { iniciarJuegoBlackjack() })
-        val btnRuletaCasino = crearBoton("🎱 Ruleta Casino", View.OnClickListener { iniciarJuegoRuletaCasino() })
+        val btnRuleta = crearBoton("🎰 Ruleta") { iniciarJuegoRuleta() }
+        val btnRasca = crearBoton("🎟️ Rasca y Gana") { iniciarJuegoRasca() }
+        val btnBlackjack = crearBoton("🃏 Blackjack") { iniciarJuegoBlackjack() }
+        val btnRuletaCasino = crearBoton("🎱 Ruleta Casino") { iniciarJuegoRuletaCasino() }
 
         layout.addView(btnRuleta)
         layout.addView(btnRasca)
@@ -109,13 +112,13 @@ class MainActivity : AppCompatActivity() {
             text = "Girar"
             setBackgroundColor(Color.parseColor("#C41E3A"))
             setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
         val btnVolver = Button(this).apply {
             text = "← Volver"
             setBackgroundColor(Color.TRANSPARENT)
             setTextColor(Color.parseColor("#D4AF37"))
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
 
         btnVolver.setOnClickListener { mostrarMenuPrincipal() }
@@ -128,9 +131,8 @@ class MainActivity : AppCompatActivity() {
             puntosUsuario -= 10
             actualizarPuntos()
             btnGirar.isEnabled = false
-            ruletaView.iniciarGiro {
-                // Resultado calculado dentro RuletaView
-                val ganancia = it * 10 // multiplicador * apuesta (10)
+            ruletaView.iniciarGiro { multiplicador ->
+                val ganancia = multiplicador * 10
                 if (ganancia > 0) {
                     puntosUsuario += ganancia
                     Toast.makeText(this, "¡Ganaste $ganancia puntos!", Toast.LENGTH_SHORT).show()
@@ -142,24 +144,33 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        layout.addView(ruletaView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            0,
-            1f
-        ))
-        layout.addView(btnGirar, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ))
-        layout.addView(btnVolver, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        ))
+        layout.addView(
+            ruletaView,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        )
+        layout.addView(
+            btnGirar,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+        layout.addView(
+            btnVolver,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
 
         contenedorJuegos.addView(layout)
     }
 
-    inner class RuletaView(context: android.content.Context) : View(context) {
+    inner class RuletaView(context: Context) : View(context) {
         private val paintSector = Paint(Paint.ANTI_ALIAS_FLAG)
         private val paintBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -170,12 +181,12 @@ class MainActivity : AppCompatActivity() {
             color = Color.WHITE
             textSize = 40f
             textAlign = Paint.Align.CENTER
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            typeface = Typeface.DEFAULT_BOLD
         }
         private val rect = RectF()
         private val multiplicadores = arrayOf(0, 0, 0, 2, 2, 3, 5, 10)
 
-        fun iniciarGiro(onResult: (multiplicador: Int) -> Unit) {
+        fun iniciarGiro(onResult: (Int) -> Unit) {
             val offset = Random.nextInt(0, 360)
             val animator = ValueAnimator.ofFloat(0f, 1440f + offset)
             animator.duration = 3000
@@ -184,7 +195,7 @@ class MainActivity : AppCompatActivity() {
                 rotation = it.animatedValue as Float
             }
             animator.addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator?) {
+                override fun onAnimationEnd(animation: Animator?) {
                     val angulo = ((rotation % 360) + 360) % 360
                     val sector = ((360 - angulo) / 45).toInt() % 8
                     val mult = multiplicadores[sector]
@@ -207,15 +218,13 @@ class MainActivity : AppCompatActivity() {
                 canvas.drawArc(rect, i * 45f, 45f, true, paintSector)
                 canvas.drawArc(rect, i * 45f, 45f, true, paintBorder)
 
-                // Dibujar texto
                 val angle = Math.toRadians((i * 45 + 22.5).toDouble())
                 val textX = cx + (radius * 0.6 * cos(angle)).toFloat()
                 val textY = cy + (radius * 0.6 * sin(angle)).toFloat() + 15f
                 canvas.drawText("x${multiplicadores[i]}", textX, textY, paintText)
             }
 
-            // Flecha dorada fija arriba
-            val path = android.graphics.Path()
+            val path = Path()
             path.moveTo(cx, cy - radius - 30)
             path.lineTo(cx - 30, cy - radius - 10)
             path.lineTo(cx + 30, cy - radius - 10)
@@ -248,13 +257,13 @@ class MainActivity : AppCompatActivity() {
             text = "Comprar carta"
             setBackgroundColor(Color.parseColor("#C41E3A"))
             setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
         val btnVolver = Button(this).apply {
             text = "← Volver"
             setBackgroundColor(Color.TRANSPARENT)
             setTextColor(Color.parseColor("#D4AF37"))
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
 
         btnVolver.setOnClickListener { mostrarMenuPrincipal() }
@@ -340,27 +349,27 @@ class MainActivity : AppCompatActivity() {
             text = "Repartir"
             setBackgroundColor(Color.parseColor("#C41E3A"))
             setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
         val btnPedir = Button(this).apply {
             text = "Pedir carta"
             setBackgroundColor(Color.parseColor("#C41E3A"))
             setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
             isEnabled = false
         }
         val btnPlantarse = Button(this).apply {
             text = "Plantarse"
             setBackgroundColor(Color.parseColor("#C41E3A"))
             setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
             isEnabled = false
         }
         val btnVolver = Button(this).apply {
             text = "← Volver"
             setBackgroundColor(Color.TRANSPARENT)
             setTextColor(Color.parseColor("#D4AF37"))
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
 
         btnVolver.setOnClickListener { mostrarMenuPrincipal() }
@@ -412,7 +421,6 @@ class MainActivity : AppCompatActivity() {
 
         btnPlantarse.setOnClickListener {
             gameActive = false
-            // Revelar segunda carta del dealer
             while (dealerCards.sum() < 17) {
                 dealerCards.add(Random.nextInt(1, 12))
             }
@@ -427,7 +435,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "¡Ganaste! +20 puntos.", Toast.LENGTH_SHORT).show()
                 }
                 playerTotal == dealerTotal -> {
-                    puntosUsuario += 10 // recupera apuesta
+                    puntosUsuario += 10
                     Toast.makeText(this, "Empate. Recuperas apuesta.", Toast.LENGTH_SHORT).show()
                 }
                 else -> {
@@ -467,37 +475,37 @@ class MainActivity : AppCompatActivity() {
             text = "Apostar Rojo"
             setBackgroundColor(Color.parseColor("#C41E3A"))
             setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
         val btnNegro = Button(this).apply {
             text = "Apostar Negro"
             setBackgroundColor(Color.parseColor("#C41E3A"))
             setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
         val btnVerde = Button(this).apply {
             text = "Apostar Verde"
             setBackgroundColor(Color.parseColor("#C41E3A"))
             setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
         val etNumero = EditText(this).apply {
             hint = "Número (0-11) opcional"
             setBackgroundColor(Color.parseColor("#1B2B4D"))
             setTextColor(Color.WHITE)
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            inputType = InputType.TYPE_CLASS_NUMBER
         }
         val btnGirar = Button(this).apply {
             text = "Girar"
             setBackgroundColor(Color.parseColor("#C41E3A"))
             setTextColor(Color.WHITE)
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
         val btnVolver = Button(this).apply {
             text = "← Volver"
             setBackgroundColor(Color.TRANSPARENT)
             setTextColor(Color.parseColor("#D4AF37"))
-            setTypeface(null, android.graphics.Typeface.BOLD)
+            setTypeface(null, Typeface.BOLD)
         }
 
         btnVolver.setOnClickListener { mostrarMenuPrincipal() }
@@ -557,11 +565,14 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        layout.addView(ruletaCasinoView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            0,
-            1f
-        ))
+        layout.addView(
+            ruletaCasinoView,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        )
         layout.addView(btnRojo)
         layout.addView(btnNegro)
         layout.addView(btnVerde)
@@ -572,7 +583,7 @@ class MainActivity : AppCompatActivity() {
         contenedorJuegos.addView(layout)
     }
 
-    inner class RuletaCasinoView(context: android.content.Context) : View(context) {
+    inner class RuletaCasinoView(context: Context) : View(context) {
         private val paintSector = Paint(Paint.ANTI_ALIAS_FLAG)
         private val paintBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
@@ -583,7 +594,7 @@ class MainActivity : AppCompatActivity() {
             color = Color.WHITE
             textSize = 30f
             textAlign = Paint.Align.CENTER
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            typeface = Typeface.DEFAULT_BOLD
         }
         private val paintBall = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.parseColor("#D4AF37")
@@ -591,7 +602,7 @@ class MainActivity : AppCompatActivity() {
         private val rect = RectF()
         private var ballAngle = 0f
 
-        fun iniciarGiro(colorApostado: String, numeroApostado: Int?, onResult: (ganancia: Int) -> Unit) {
+        fun iniciarGiro(colorApostado: String, numeroApostado: Int?, onResult: (Int) -> Unit) {
             val offset = Random.nextInt(0, 360)
             val animator = ValueAnimator.ofFloat(0f, 360f + offset)
             animator.duration = 3500
@@ -601,7 +612,7 @@ class MainActivity : AppCompatActivity() {
                 invalidate()
             }
             animator.addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator?) {
+                override fun onAnimationEnd(animation: Animator?) {
                     val finalAngle = (ballAngle % 360 + 360) % 360
                     val sector = ((finalAngle) / 30).toInt() % 12
                     val colorSector = when {
@@ -609,11 +620,10 @@ class MainActivity : AppCompatActivity() {
                         sector % 2 == 1 -> "rojo"
                         else -> "negro"
                     }
-                    var ganancia = 0
-                    if (numeroApostado != null && numeroApostado == sector) {
-                        ganancia = 150
-                    } else if (colorApostado == colorSector) {
-                        ganancia = 30
+                    val ganancia = when {
+                        numeroApostado != null && numeroApostado == sector -> 150
+                        colorApostado == colorSector -> 30
+                        else -> 0
                     }
                     onResult(ganancia)
                 }
@@ -631,21 +641,19 @@ class MainActivity : AppCompatActivity() {
 
             for (i in 0 until 12) {
                 paintSector.color = when {
-                    i == 0 -> Color.parseColor("#2E7D32") // verde
-                    i % 2 == 1 -> Color.parseColor("#C41E3A") // rojo
-                    else -> Color.parseColor("#1A1A1A") // negro
+                    i == 0 -> Color.parseColor("#2E7D32")
+                    i % 2 == 1 -> Color.parseColor("#C41E3A")
+                    else -> Color.parseColor("#1A1A1A")
                 }
                 canvas.drawArc(rect, i * 30f, 30f, true, paintSector)
                 canvas.drawArc(rect, i * 30f, 30f, true, paintBorder)
 
-                // Dibujar número
                 val angle = Math.toRadians((i * 30 + 15).toDouble())
                 val textX = cx + (radius * 0.7 * cos(angle)).toFloat()
                 val textY = cy + (radius * 0.7 * sin(angle)).toFloat() + 10f
                 canvas.drawText(i.toString(), textX, textY, paintText)
             }
 
-            // Dibujar bola
             val ballRadius = radius * 0.07f
             val ballX = cx + (radius * 0.8 * cos(Math.toRadians(ballAngle.toDouble()))).toFloat()
             val ballY = cy + (radius * 0.8 * sin(Math.toRadians(ballAngle.toDouble()))).toFloat()
